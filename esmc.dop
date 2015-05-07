@@ -112,7 +112,7 @@ vector CARTSTARTVEC=$BFFA
 data KBCODE=$D209
 data SERIN=$D20D
 data SKSTAT=$D20F
-org B800
+org A000
 labels 1
 comment 1
 call 1
