@@ -24,7 +24,7 @@ periodacc equ $A0		; Access: BA35 BC6B BC6D
 accum equ $A2		; Access: BA2D BA30
 startflag equ $A3		; Access: B8E1 B802
 VIMIRQ equ $216		; Access: B838
-GLBABS equ $2E0		; Access: BCE9
+RUNAD equ $2E0		; Access: BCE9
 buf equ $600		; Access: BAAA B942
 charset equ $C00
 HPOSP0 equ $D000		; Access: B814
@@ -747,12 +747,12 @@ restorecolors		; Callers: B906 B970 B936 -c BCC7
     lda colortbl+6		; BCDF: AD 72 BD
     sta COLPF1		; BCE2: 8D 17 D0
     rts    		; BCE5: 60
-unknown			; Callers: -c BCE6
+setrunad		; Callers: -c BCE6
     pha    		; BCE6: 48
     lda #$00		; BCE7: A9 00
-    sta GLBABS		; BCE9: 8D E0 02
+    sta RUNAD		; BCE9: 8D E0 02
     lda #$B8		; BCEC: A9 B8
-    sta GLBABS+1		; BCEE: 8D E1 02
+    sta RUNAD+1		; BCEE: 8D E1 02
     pla    		; BCF1: 68
 cartinit		; Callers: -c BCF2 -v BFFE
     rts    		; BCF2: 60
