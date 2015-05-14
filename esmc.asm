@@ -5,7 +5,7 @@ curptr equ $82		; Access: BBFE BC4E B913 BB84 BBEB BB9D BBAE BB1B BB25
 nextlineptr equ $84		; Access: BC53 BC65 BBED BB1F BB23
 ptr1 equ $86		; Access: BC0F BB8B BB8F BB97 BBAA BBAC BBD1 BBD5 BBC2 BBC6 B842
 ptr2 equ $88		; Access: B8B2 B8C4 B853 B858 B844
-timeremains equ $8A		; Access: B94D B921 BC3D
+taperunning equ $8A		; Access: B94D B921 BC3D
 lastkey equ $8B		; Access: B95C BBFA B96A B998 B9B4 B9D4 B9DA
 bitmask equ $8E		; Access: BBBA BBCF BBD3 BBC4
 bufwriteindex equ $90		; Access: BAA8 BAAE B93E B8D5
@@ -162,11 +162,11 @@ enableserial		; Callers: -c B8D0
     bit startflag		; B8E1: 24 A3
     bpl waitstartkeyup		; B8E3: 10 08
 waitstartkeydown	; Callers: B8EB -c B8E5
-    jsr changecolors		; B8E5: 20 76 BC
+    jsr attract		; B8E5: 20 76 BC
     bit CONSOL		; B8E8: 2C 1F D0
     bne waitstartkeydown		; B8EB: D0 F8
 waitstartkeyup		; Callers: B8E3 B8F5 -c B8ED
-    jsr changecolors		; B8ED: 20 76 BC
+    jsr attract		; B8ED: 20 76 BC
     bit CONSOL		; B8F0: 2C 1F D0
     bne start		; B8F3: D0 02
     beq waitstartkeyup		; B8F5: F0 F6
@@ -188,9 +188,10 @@ correct			; Callers: B962 B968 B8FC -c B8FF
     lda #$09		; B915: A9 09
     sta curptr+1		; B917: 85 83
     jsr computenextlineptr		; B919: 20 4E BC
+motoron			; Callers: -c B91C
     lda #$30		; B91C: A9 30
     sta PACTL		; B91E: 8D 02 D3
-    sta timeremains		; B921: 85 8A
+    sta taperunning		; B921: 85 8A
     lda #$14		; B923: A9 14
     sta timer		; B925: 85 9D
 checksso		; Callers: -c B927 B94F
@@ -203,7 +204,7 @@ checksso		; Callers: -c B927 B94F
     sta colorcount2+1		; B934: 85 95
     jsr restorecolors		; B936: 20 C7 BC
 donesso			; Callers: B92E -c B939
-    jsr changecolors		; B939: 20 76 BC
+    jsr attract		; B939: 20 76 BC
 read_from_ring_buffer	; Callers: -c B93C
     ldx bufreadindex		; B93C: A6 91
     cpx bufwriteindex		; B93E: E4 90
@@ -214,14 +215,14 @@ read_from_ring_buffer	; Callers: -c B93C
     jsr writechar1		; B948: 20 B3 BA
 readdone		; Callers: B940 -c B94B
     lda #$00		; B94B: A9 00
-    cmp timeremains		; B94D: C5 8A
+    cmp taperunning		; B94D: C5 8A
     bne checksso		; B94F: D0 D6
     lda #$FE		; B951: A9 FE
     sta colorcount2		; B953: 85 94
     sta colorcount2+1		; B955: 85 95
 waitkey			; Callers: B95E B96E B98E B99A -c B957
     cli    		; B957: 58
-    jsr changecolors		; B958: 20 76 BC
+    jsr attract		; B958: 20 76 BC
     sei    		; B95B: 78
     lda lastkey		; B95C: A5 8B
     bmi waitkey		; B95E: 30 F7
@@ -233,6 +234,7 @@ waitkey			; Callers: B95E B96E B98E B99A -c B957
     lda lastkey		; B96A: A5 8B
     cmp #$03		; B96C: C9 03
     beq waitkey		; B96E: F0 E7
+wrong			; Callers: -c B970
     jsr restorecolors		; B970: 20 C7 BC
     lda #$FE		; B973: A9 FE
     sta colorcount2		; B975: 85 94
@@ -240,12 +242,14 @@ waitkey			; Callers: B95E B96E B98E B99A -c B957
     lda #$00		; B979: A9 00
     sta WSYNC		; B97B: 8D 0A D4
     sta CHACTL		; B97E: 8D 01 D4
+buzzon			; Callers: -c B981
     lda #$A8		; B981: A9 A8
     sta AUDC1		; B983: 8D 01 D2
     sta AUDC2		; B986: 8D 03 D2
     lda #$04		; B989: A9 04
     bit SKSTAT		; B98B: 2C 0F D2
     beq waitkey		; B98E: F0 C7
+buzzoff			; Callers: -c B990
     lda #$A0		; B990: A9 A0
     sta AUDC1		; B992: 8D 01 D2
     sta AUDC2		; B995: 8D 03 D2
@@ -491,35 +495,35 @@ checkforanswer		; Callers: BB19 -c BB2F
     adc #$01		; BB2F: 69 01
     bpl lBB39		; BB31: 10 06
     adc #$04		; BB33: 69 04
-    bmi checkforcontinue		; BB35: 30 03
+    bmi checkforwaitforkey		; BB35: 30 03
 setanswer		; Callers: -c BB37
     sta answer		; BB37: 85 81
 lBB39			; Callers: BB31
     rts    		; BB39: 60
-checkforcontinue	; Callers: BB35 -c BB3A
+checkforwaitforkey	; Callers: BB35 -c BB3A
     adc #$01		; BB3A: 69 01
     bmi checkforchactl		; BB3C: 30 06
-setcontinue		; Callers: -c BB3E
+setwaitforkey		; Callers: -c BB3E
     lda #$03		; BB3E: A9 03
     sta answer		; BB40: 85 81
-    bne lBB57		; BB42: D0 13
+    bne setpause		; BB42: D0 13
 checkforchactl		; Callers: BB3C -c BB44
     adc #$01		; BB44: 69 01
     bpl lBB52		; BB46: 10 0A
-setchactl		; Callers: -c BB48
     adc #$01		; BB48: 69 01
-    bmi lBB53		; BB4A: 30 07
+    bmi checkforpause		; BB4A: 30 07
+setchactl		; Callers: -c BB4C
     sta WSYNC		; BB4C: 8D 0A D4
     sta CHACTL		; BB4F: 8D 01 D4
 lBB52			; Callers: BB46
     rts    		; BB52: 60
-lBB53			; Callers: BB4A
+checkforpause		; Callers: BB4A -c BB53
     adc #$01		; BB53: 69 01
-    bmi lBB5B		; BB55: 30 04
-lBB57			; Callers: BB42
-    jsr checktimer		; BB57: 20 32 BC
+    bmi checkforclear		; BB55: 30 04
+setpause		; Callers: BB42 -c BB57
+    jsr pausetape		; BB57: 20 32 BC
     rts    		; BB5A: 60
-lBB5B			; Callers: BB55
+checkforclear		; Callers: BB55 -c BB5B
     adc #$01		; BB5B: 69 01
     bmi checkforchactl2		; BB5D: 30 04
     jsr homeinit		; BB5F: 20 F2 BB
@@ -634,11 +638,11 @@ homeinit		; Callers: B90E BB5F -c BBF2
     lda #$00		; BC0D: A9 00
     sta ptr1		; BC0F: 85 86
     ldy #$0C		; BC11: A0 0C
-writefiller		; Callers: BC1A -c BC13
+clearscreen		; Callers: BC1A -c BC13
     sta (ZP,x)		; BC13: 81 00
     jsr incword_at_x		; BC15: 20 47 BC
     cpy ptr1+1		; BC18: C4 87
-    bne writefiller		; BC1A: D0 F7
+    bne clearscreen		; BC1A: D0 F7
     lda #$00		; BC1C: A9 00
     sta WSYNC		; BC1E: 8D 0A D4
     sta CHACTL		; BC21: 8D 01 D4
@@ -648,16 +652,17 @@ writefiller		; Callers: BC1A -c BC13
     sta DMACTL		; BC2B: 8D 00 D4
     stx GRACTL		; BC2E: 8E 1D D0
     rts    		; BC31: 60
-checktimer		; Callers: BB57 -c BC32
+pausetape		; Callers: setpause -c BC32
     dec timer		; BC32: C6 9D
-    bpl donechecktimer		; BC34: 10 0E
+    bpl donepausetape		; BC34: 10 0E
     lda #$38		; BC36: A9 38
+motoroff		; Callers: -c BC38
     sta PACTL		; BC38: 8D 02 D3
     lda #$00		; BC3B: A9 00
-    sta timeremains		; BC3D: 85 8A
+    sta taperunning		; BC3D: 85 8A
     lda #$40		; BC3F: A9 40
     sta IRQEN		; BC41: 8D 0E D2
-donechecktimer		; Callers: BC34 -c BC44
+donepausetape		; Callers: BC34 -c BC44
     inc timer		; BC44: E6 9D
     rts    		; BC46: 60
 incword_at_x		; Callers: BC7B BC82 BC15 advancecursor B8C1 B855 -c BC47
@@ -691,16 +696,16 @@ accumulate		; Callers: BA45 BA4C BA57 BA5E BA69 -c BC68
     adc periodacc+1		; BC71: 65 A1
     sta periodacc+1		; BC73: 85 A1
     rts    		; BC75: 60
-changecolors		; Callers: donesso B958 waitstartkeyup waitstartkeydown -c BC76
+attract			; Callers: donesso B958 waitstartkeyup waitstartkeydown -c BC76
     pha    		; BC76: 48
     txa    		; BC77: 8A
     pha    		; BC78: 48
     ldx #$92		; BC79: A2 92
     jsr incword_at_x		; BC7B: 20 47 BC
-    bne changecolorsdone		; BC7E: D0 43
+    bne attractdone		; BC7E: D0 43
     ldx #$94		; BC80: A2 94
     jsr incword_at_x		; BC82: 20 47 BC
-    bne changecolorsdone		; BC85: D0 3C
+    bne attractdone		; BC85: D0 3C
     lda #$FE		; BC87: A9 FE
     sta colorcount2		; BC89: 85 94
     lda #$FF		; BC8B: A9 FF
@@ -729,12 +734,12 @@ changecolors		; Callers: donesso B958 waitstartkeyup waitstartkeydown -c BC76
     sta colbakshadow		; BCBC: 85 97
     and #$F7		; BCBE: 29 F7
     sta COLBK		; BCC0: 8D 1A D0
-changecolorsdone	; Callers: BC7E BC85 -c BCC3
+attractdone		; Callers: BC7E BC85 -c BCC3
     pla    		; BCC3: 68
     tax    		; BCC4: AA
     pla    		; BCC5: 68
     rts    		; BCC6: 60
-restorecolors		; Callers: B906 B970 B936 -c BCC7
+restorecolors		; Callers: B906 wrong B936 -c BCC7
     lda colpf2shadow2		; BCC7: A5 99
     sta COLPF2		; BCC9: 8D 18 D0
     lda colbakshadow2		; BCCC: A5 9A

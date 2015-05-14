@@ -8,6 +8,7 @@ esmc.bin:
 
 %.new.bin: %.asm
 	xasm /t:$*.lab /l:$*.lst $< /o:$@
+	perl -pi -e 's/^n/ /' $*.lab
 
 %.asm: %.long.asm
 	perl -pe 's/h-/h-f+/;print "    org \$$A000\n    dta \$$FF\n    org \$$B800\n" if /org/;$$_="" if /org/../B7FF/;' $< $(out)
